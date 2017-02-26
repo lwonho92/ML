@@ -1,2 +1,2 @@
 # ML
-This is an android application with gesture detection with machine learning.
+This is an android application that using gesture detection with machine learning.
