@@ -1,0 +1,61 @@
+import tensorflow as tf
+import numpy as np
+
+xy = np.loadtxt('train.txt', unpack=True, dtype='float32')
+x_data = xy[0:-1]
+y_data = xy[-1]
+
+X = tf.placeholder(tf.float32, name='X-input')
+Y = tf.placeholder(tf.float32, name='Y-input')
+
+W = tf.Variable(tf.random_uniform([1, len(x_data)], -1.0, 1.0), name='Weight1')
+
+# H(X) = 1 / ( 1 + exp( -W * X ) )
+h = tf.matmul(W, X)
+hypothesis = tf.div(1., 1.+tf.exp(-h))
+
+# cost(W) = ( -1 / m ) * sigma( y * log( H(x) ) + (1 - y) * log( 1 - H(x) ) )
+with tf.name_scope("cost") as scope:
+    cost = -tf.reduce_mean(Y * tf.log(hypothesis) + (1 - Y) * tf.log(1 - hypothesis))
+    cost_summ = tf.scalar_summary("cost", cost)
+
+w_hist = tf.histogram_summary("weights", W)
+y_hist = tf.histogram_summary("y", Y)
+
+# W := W - alpha * cost'(W)
+# new_W = old_W - alpha * cost'(old_W)
+
+a = tf.Variable(0.1)
+optimizer = tf.train.GradientDescentOptimizer(a)
+train = optimizer.minimize(cost)
+
+init = tf.initialize_all_variables()
+
+sess = tf.Session()
+sess.run(init)
+
+merged = tf.merge_all_summaries()
+writer = tf.train.SummaryWriter("./logs/xor_logs", sess.graph_def)
+
+for step in xrange(2001):
+    sess.run(train, feed_dict={X:x_data, Y:y_data})
+    if step % 20 == 0:
+        summary = sess.run(merged, feed_dict={X:x_data, Y:y_data})
+        writer.add_summary(summary, step)
+        print step, sess.run(cost, feed_dict={X:x_data, Y:y_data}), sess.run(W)
+
+print '-------------------------------------------'
+print sess.run(hypothesis, feed_dict={X:[[1], [2], [2]]}) > 0.5
+print sess.run(hypothesis, feed_dict={X:[[1], [5], [5]]}) > 0.5
+
+print sess.run(hypothesis, feed_dict={X:[[1, 1], [4, 3], [3, 5]]}) > 0.5
+
+# ds(x) / dx = s(x) * (1 - s(x))
+# d / dx * log(x) = log(e) / x
+
+# log'(hypothesis) = hypothesis` * log(e) / hypothesis = s(x) * (1 - s(x)) * log(e) / s(x)
+# log'(1 - hypothesis) = - hypothesis` * log(e) / (1 - hypothesis) = - s(x) * (1 - s(x)) * log(e) / (1 - s(x))
+
+# cost' = ( -1 / m ) * sigma'( y * log( H(x) ) + (1 - y) * log( 1 - H(x) ) )
+#       = ( -1 / m ) * sigma( y * log'( H(x) ) + (1 - y) * log'( 1 - H(x) ) )
+#       = ( -1 / m ) * sigma( y * ( s(x) * (1 - s(x)) * log(e) / s(x) ) + (1 - y) * ( - s(x) * (1 - s(x)) * log(e) / (1 - s(x)) ) )
